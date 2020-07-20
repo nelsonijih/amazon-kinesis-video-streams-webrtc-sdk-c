@@ -25,10 +25,11 @@ STATUS getIceCandidatePairStats(PRtcPeerConnection, PRtcIceCandidatePairStats);
  * @brief Get specific ICE candidate stats
  * @param [in] PRtcPeerConnection Contains the Ice agent object with diagnostics object
  * @param [in/out] PRtcIceCandidateStats Fill up the ICE candidate stats for application consumption
+ * @param [in] BOOL If TRUE, local candidate stats are extracted, else remote candidate stats are extracted
  * @return Pass/Fail
  *
  */
-STATUS getIceCandidateStats(PRtcPeerConnection, PRtcIceCandidateStats);
+STATUS getIceCandidateStats(PRtcPeerConnection, PRtcIceCandidateStats, BOOL);
 
 /**
  * @brief Get specific ICE server stats

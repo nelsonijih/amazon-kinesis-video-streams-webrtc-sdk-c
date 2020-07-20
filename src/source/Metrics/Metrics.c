@@ -18,6 +18,27 @@ CleanUp:
     return retStatus;
 }
 
+STATUS logIceCandidateMetrics(PRtcIceCandidateStats pRtcIceCandidateStats, BOOL isLocal)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    CHK(pRtcIceCandidateStats != NULL, STATUS_NULL_ARG);
+    if (isLocal) {
+        DLOGD("=========Local candidate stats=========");
+        DLOGD("Candidate relay protocol: %s", pRtcIceCandidateStats->relayProtocol);
+        DLOGD("Candidate Ice server source: %s", pRtcIceCandidateStats->url);
+    } else {
+        DLOGD("=========Remote candidate stats=========");
+    }
+    DLOGD("Candidate IP Address: %s", pRtcIceCandidateStats->address);
+    DLOGD("Candidate type: %s", iceAgentGetCandidateTypeStr(pRtcIceCandidateStats->candidateType));
+    DLOGD("Candidate port: %d", pRtcIceCandidateStats->port);
+    DLOGD("Candidate priority: %d", pRtcIceCandidateStats->priority);
+    DLOGD("Candidate transport protocol: %s", pRtcIceCandidateStats->protocol);
+
+CleanUp:
+    return retStatus;
+}
+
 STATUS getIceCandidatePairStats(PRtcPeerConnection pRtcPeerConnection, PRtcIceCandidatePairStats pRtcIceCandidatePairStats)
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -29,13 +50,26 @@ CleanUp:
     return retStatus;
 }
 
-STATUS getIceCandidateStats(PRtcPeerConnection pRtcPeerConnection, PRtcIceCandidateStats pRtcIceCandidateStats)
+STATUS getIceCandidateStats(PRtcPeerConnection pRtcPeerConnection, PRtcIceCandidateStats pRtcIceCandidateStats, BOOL isLocal)
 {
     STATUS retStatus = STATUS_SUCCESS;
-    PKvsPeerConnection pKvsPeerConnection = (PKvsPeerConnection) pRtcPeerConnection;
-    UNUSED_PARAM(pKvsPeerConnection);
+    PIceAgent pIceAgent = ((PKvsPeerConnection) pRtcPeerConnection)->pIceAgent;
     CHK((pRtcPeerConnection != NULL || pRtcIceCandidateStats != NULL), STATUS_NULL_ARG);
-    CHK(FALSE, STATUS_NOT_IMPLEMENTED);
+    if (isLocal) {
+        STRCPY(pRtcIceCandidateStats->address, pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.address);
+        pRtcIceCandidateStats->candidateType = pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.candidateType;
+        pRtcIceCandidateStats->port = pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.port;
+        pRtcIceCandidateStats->priority = pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.priority;
+        STRCPY(pRtcIceCandidateStats->protocol, pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.protocol);
+        STRCPY(pRtcIceCandidateStats->relayProtocol, pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.relayProtocol);
+        STRCPY(pRtcIceCandidateStats->url, pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.url);
+    } else {
+        STRCPY(pRtcIceCandidateStats->address, pIceAgent->rtcSelectedRemoteIceCandidateDiagnostics.address);
+        pRtcIceCandidateStats->candidateType = pIceAgent->rtcSelectedRemoteIceCandidateDiagnostics.candidateType;
+        pRtcIceCandidateStats->port = pIceAgent->rtcSelectedRemoteIceCandidateDiagnostics.port;
+        pRtcIceCandidateStats->priority = pIceAgent->rtcSelectedRemoteIceCandidateDiagnostics.priority;
+        STRCPY(pRtcIceCandidateStats->protocol, pIceAgent->rtcSelectedRemoteIceCandidateDiagnostics.protocol);
+    }
 CleanUp:
     return retStatus;
 }
@@ -44,7 +78,6 @@ STATUS getIceServerStats(PRtcPeerConnection pRtcPeerConnection, PRtcIceServerSta
 {
     STATUS retStatus = STATUS_SUCCESS;
     PKvsPeerConnection pKvsPeerConnection = (PKvsPeerConnection) pRtcPeerConnection;
-    UNUSED_PARAM(pKvsPeerConnection);
     CHK((pRtcPeerConnection != NULL && pRtcIceServerStats != NULL), STATUS_NULL_ARG);
     CHK(pRtcIceServerStats->iceServerIndex < pKvsPeerConnection->pIceAgent->iceServersCount, STATUS_ICE_SERVER_INDEX_INVALID);
 
@@ -113,10 +146,18 @@ STATUS rtcPeerConnectionGetMetrics(PRtcPeerConnection pRtcPeerConnection, PRtcSt
             getIceCandidatePairStats(pRtcPeerConnection, &pRtcMetrics->rtcStatsObject.iceCandidatePairStats);
             break;
         case RTC_STATS_TYPE_LOCAL_CANDIDATE:
-            getIceCandidateStats(pRtcPeerConnection, &pRtcMetrics->rtcStatsObject.localIceCandidateStats);
+            CHK_STATUS(getIceCandidateStats(pRtcPeerConnection, &pRtcMetrics->rtcStatsObject.localIceCandidateStats, TRUE));
+            if (NULL != getenv(LOG_STATS)) {
+                DLOGD("ICE local candidate Stats requested at %" PRIu64, pRtcMetrics->timestamp);
+                logIceCandidateMetrics(&pRtcMetrics->rtcStatsObject.localIceCandidateStats, TRUE);
+            }
             break;
         case RTC_STATS_TYPE_REMOTE_CANDIDATE:
-            getIceCandidateStats(pRtcPeerConnection, &pRtcMetrics->rtcStatsObject.remoteIceCandidateStats);
+            CHK_STATUS(getIceCandidateStats(pRtcPeerConnection, &pRtcMetrics->rtcStatsObject.remoteIceCandidateStats, FALSE));
+            if (NULL != getenv(LOG_STATS)) {
+                DLOGD("ICE local candidate Stats requested at %" PRIu64, pRtcMetrics->timestamp);
+                logIceCandidateMetrics(&pRtcMetrics->rtcStatsObject.remoteIceCandidateStats, FALSE);
+            }
             break;
         case RTC_STATS_TYPE_TRANSPORT:
             getTransportStats(pRtcPeerConnection, &pRtcMetrics->rtcStatsObject.transportStats);

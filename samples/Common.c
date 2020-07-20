@@ -32,13 +32,17 @@ VOID onDataChannel(UINT64 customData, PRtcDataChannel pRtcDataChannel)
 VOID onConnectionStateChange(UINT64 customData, RTC_PEER_CONNECTION_STATE newState)
 {
     PSampleStreamingSession pSampleStreamingSession = (PSampleStreamingSession) customData;
-
+    STATUS retStatus = STATUS_SUCCESS;
     DLOGI("New connection state %u", newState);
 
     if (newState == RTC_PEER_CONNECTION_STATE_FAILED || newState == RTC_PEER_CONNECTION_STATE_CLOSED ||
         newState == RTC_PEER_CONNECTION_STATE_DISCONNECTED) {
         ATOMIC_STORE_BOOL(&pSampleStreamingSession->terminateFlag, TRUE);
         CVAR_BROADCAST(pSampleStreamingSession->pSampleConfiguration->cvar);
+    } else if (newState == RTC_PEER_CONNECTION_STATE_CONNECTED) {
+        if ((retStatus = getSelectedIceCandidateInformation(pSampleStreamingSession)) != STATUS_SUCCESS) {
+            DLOGW("Failed to get information about selected Ice candidates: 0x%08x", retStatus);
+        }
     }
 }
 
@@ -175,6 +179,64 @@ CleanUp:
     return retStatus;
 }
 
+STATUS getSelectedIceCandidateInformation(PSampleStreamingSession pSampleStreamingSession)
+{
+    ENTERS();
+    STATUS retStatus = STATUS_SUCCESS;
+    RtcStats rtcMetrics;
+    CHAR candidateTypeStr[10];
+    CHK(pSampleStreamingSession != NULL, STATUS_NULL_ARG);
+    rtcMetrics.requestedTypeOfStats = RTC_STATS_TYPE_LOCAL_CANDIDATE;
+    CHK_STATUS(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, &rtcMetrics));
+    switch (rtcMetrics.rtcStatsObject.localIceCandidateStats.candidateType) {
+        case ICE_CANDIDATE_TYPE_HOST:
+            STRCPY(candidateTypeStr, "host");
+            break;
+        case ICE_CANDIDATE_TYPE_SERVER_REFLEXIVE:
+            STRCPY(candidateTypeStr, "srflx");
+            break;
+        case ICE_CANDIDATE_TYPE_PEER_REFLEXIVE:
+            STRCPY(candidateTypeStr, "prflx");
+            break;
+        case ICE_CANDIDATE_TYPE_RELAYED:
+            STRCPY(candidateTypeStr, "relay");
+            break;
+    }
+    DLOGD("Candidate IP Address: %s", rtcMetrics.rtcStatsObject.localIceCandidateStats.address);
+    DLOGD("Local Candidate type: %s", candidateTypeStr);
+    DLOGD("Local Candidate port: %d", rtcMetrics.rtcStatsObject.localIceCandidateStats.port);
+    DLOGD("Local Candidate priority: %d", rtcMetrics.rtcStatsObject.localIceCandidateStats.priority);
+    DLOGD("Local Candidate transport protocol: %s", rtcMetrics.rtcStatsObject.localIceCandidateStats.protocol);
+    DLOGD("Local Candidate relay protocol: %s", rtcMetrics.rtcStatsObject.localIceCandidateStats.relayProtocol);
+    DLOGD("Local Candidate Ice server source: %s", rtcMetrics.rtcStatsObject.localIceCandidateStats.url);
+
+    rtcMetrics.requestedTypeOfStats = RTC_STATS_TYPE_REMOTE_CANDIDATE;
+    MEMSET(candidateTypeStr, 0, SIZEOF(candidateTypeStr));
+    CHK_STATUS(rtcPeerConnectionGetMetrics(pSampleStreamingSession->pPeerConnection, &rtcMetrics));
+    switch (rtcMetrics.rtcStatsObject.remoteIceCandidateStats.candidateType) {
+        case ICE_CANDIDATE_TYPE_HOST:
+            STRCPY(candidateTypeStr, "host");
+            break;
+        case ICE_CANDIDATE_TYPE_SERVER_REFLEXIVE:
+            STRCPY(candidateTypeStr, "srflx");
+            break;
+        case ICE_CANDIDATE_TYPE_PEER_REFLEXIVE:
+            STRCPY(candidateTypeStr, "prflx");
+            break;
+        case ICE_CANDIDATE_TYPE_RELAYED:
+            STRCPY(candidateTypeStr, "relay");
+            break;
+    }
+    DLOGD("Remote Candidate IP Address: %s", rtcMetrics.rtcStatsObject.remoteIceCandidateStats.address);
+    DLOGD("Remote Candidate type: %s", candidateTypeStr);
+    DLOGD("Remote Candidate port: %d", rtcMetrics.rtcStatsObject.remoteIceCandidateStats.port);
+    DLOGD("Remote Candidate priority: %d", rtcMetrics.rtcStatsObject.remoteIceCandidateStats.priority);
+    DLOGD("Remote Candidate transport protocol: %s", rtcMetrics.rtcStatsObject.remoteIceCandidateStats.protocol);
+CleanUp:
+    LEAVES();
+    return retStatus;
+}
+
 STATUS handleAnswer(PSampleConfiguration pSampleConfiguration, PSampleStreamingSession pSampleStreamingSession, PSignalingMessage pSignalingMessage)
 {
     UNUSED_PARAM(pSampleConfiguration);
@@ -253,7 +315,6 @@ STATUS handleOffer(PSampleConfiguration pSampleConfiguration, PSampleStreamingSe
         THREAD_CREATE(&pSampleStreamingSession->receiveAudioVideoSenderTid, pSampleConfiguration->receiveAudioVideoSource,
                       (PVOID) pSampleStreamingSession);
     }
-
 CleanUp:
 
     CHK_LOG_ERR(retStatus);

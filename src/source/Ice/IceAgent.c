@@ -1774,6 +1774,47 @@ CleanUp:
     return retStatus;
 }
 
+STATUS updateSelectedLocalRemoteCandidateStats(PIceAgent pIceAgent)
+{
+    STATUS retStatus = STATUS_SUCCESS;
+    CHK(pIceAgent != NULL, STATUS_NULL_ARG);
+
+    // Get selected local candidate stats
+    getIpAddrStr(&pIceAgent->pDataSendingIceCandidatePair->local->ipAddress, pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.address,
+                 ARRAY_SIZE(pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.address));
+    pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.port = pIceAgent->pDataSendingIceCandidatePair->local->ipAddress.port;
+    pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.priority = pIceAgent->pDataSendingIceCandidatePair->local->priority;
+    pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.candidateType = pIceAgent->pDataSendingIceCandidatePair->local->iceCandidateType;
+    STRCPY(pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.url,
+           pIceAgent->iceServers[pIceAgent->pDataSendingIceCandidatePair->local->iceServerIndex].url);
+    STRCPY(pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.protocol,
+           pIceAgent->rtcIceServerDiagnostics[pIceAgent->pDataSendingIceCandidatePair->local->iceServerIndex].protocol);
+    if (pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.candidateType == ICE_CANDIDATE_TYPE_RELAYED) {
+        switch (pIceAgent->pDataSendingIceCandidatePair->local->pTurnConnection->protocol) {
+            case KVS_SOCKET_PROTOCOL_UDP:
+                STRCPY(pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.relayProtocol, ICE_URL_TRANSPORT_UDP);
+                break;
+            case KVS_SOCKET_PROTOCOL_TCP:
+                STRCPY(pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.relayProtocol, ICE_URL_TRANSPORT_TCP);
+                break;
+            default:
+                MEMSET(pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.relayProtocol, 0,
+                       SIZEOF(pIceAgent->rtcSelectedLocalIceCandidateDiagnostics.relayProtocol));
+        }
+    }
+
+    // Get remote candidate related stats
+    getIpAddrStr(&pIceAgent->pDataSendingIceCandidatePair->remote->ipAddress, pIceAgent->rtcSelectedRemoteIceCandidateDiagnostics.address,
+                 ARRAY_SIZE(pIceAgent->rtcSelectedRemoteIceCandidateDiagnostics.address));
+    pIceAgent->rtcSelectedRemoteIceCandidateDiagnostics.port = pIceAgent->pDataSendingIceCandidatePair->remote->ipAddress.port;
+    pIceAgent->rtcSelectedRemoteIceCandidateDiagnostics.priority = pIceAgent->pDataSendingIceCandidatePair->remote->priority;
+    pIceAgent->rtcSelectedRemoteIceCandidateDiagnostics.candidateType = pIceAgent->pDataSendingIceCandidatePair->remote->iceCandidateType;
+    STRCPY(pIceAgent->rtcSelectedRemoteIceCandidateDiagnostics.protocol,
+           pIceAgent->rtcIceServerDiagnostics[pIceAgent->pDataSendingIceCandidatePair->remote->iceServerIndex].protocol);
+CleanUp:
+    return retStatus;
+}
+
 STATUS iceAgentConnectedStateSetup(PIceAgent pIceAgent)
 {
     STATUS retStatus = STATUS_SUCCESS;
@@ -1822,6 +1863,7 @@ STATUS iceAgentConnectedStateSetup(PIceAgent pIceAgent)
 
         if (pIceCandidatePair->state == ICE_CANDIDATE_PAIR_STATE_SUCCEEDED) {
             pIceAgent->pDataSendingIceCandidatePair = pIceCandidatePair;
+            updateSelectedLocalRemoteCandidateStats(pIceAgent);
             break;
         }
     }

@@ -22,8 +22,19 @@ extern "C" {
 #define MAX_SRTP_CIPHER_LENGTH    64U
 #define MAX_TLS_GROUP_LENGHTH     32U
 #define MAX_PROTOCOL_LENGTH       8U
+#define IP_ADDR_STR_LENGTH        45U
 
 #define MAX_STATS_STRING_LENGTH 255U
+
+/**
+ * Type of ICE Candidate
+ */
+typedef enum {
+    ICE_CANDIDATE_TYPE_HOST = 0,             //!< ICE_CANDIDATE_TYPE_HOST
+    ICE_CANDIDATE_TYPE_PEER_REFLEXIVE = 1,   //!< ICE_CANDIDATE_TYPE_PEER_REFLEXIVE
+    ICE_CANDIDATE_TYPE_SERVER_REFLEXIVE = 2, //!< ICE_CANDIDATE_TYPE_SERVER_REFLEXIVE
+    ICE_CANDIDATE_TYPE_RELAYED = 3,          //!< ICE_CANDIDATE_TYPE_RELAYED
+} ICE_CANDIDATE_TYPE;
 
 /**
  * @brief Type of Stats object requested by the application
@@ -190,13 +201,14 @@ typedef struct {
 
 typedef struct {
     CHAR url[MAX_STATS_STRING_LENGTH + 1];         //!< For local candidates this is the URL of the ICE server from which the candidate was obtained
-    CHAR transportId[MAX_STATS_STRING_LENGTH + 1]; //!< ID of object that was inspected for RTCTransportStats
-    BYTE address[MAX_STATS_ADDRESS_LENGTH];        //!< IPv4 or IPv6 address of the candidate
+    CHAR transportId[MAX_STATS_STRING_LENGTH + 1]; //!< Not used currently. ID of object that was inspected for RTCTransportStats
+    CHAR address[IP_ADDR_STR_LENGTH + 1];          //!< IPv4 or IPv6 address of the candidate
     CHAR protocol[MAX_PROTOCOL_LENGTH + 1];        //!< Valid values: UDP, TCP
-    CHAR relayProtocol[MAX_RELAY_PROTOCOL_LENGTH + 1]; //!< Protocol used by endpoint to communicate with TURN server.
+    CHAR relayProtocol[MAX_RELAY_PROTOCOL_LENGTH + 1]; //!< Protocol used by endpoint to communicate with TURN server. (Only for local candidate)
                                                        //!< Valid values: UDP, TCP, TLS
     INT32 priority;                                    //!< Computed using the formula in https://tools.ietf.org/html/rfc5245#section-15.1
     INT32 port;                                        //!< Port number of the candidate
+    ICE_CANDIDATE_TYPE candidateType;                  //!< Type of local/remote ICE candidate
 } RtcIceCandidateStats, *PRtcIceCandidateStats;
 
 /**
